@@ -433,8 +433,6 @@ async def seed():
         {"email": "admin@digicampus.edu", "password": "admin123", "name": "System Administrator", "role": "admin"},
         {"email": "security@digicampus.edu", "password": "password123", "name": "Rajesh Kumar", "role": "security"},
     ]
-    # Clean up any existing ops_manager users from previous seed
-    await db.users.delete_many({"role": "ops_manager"})
     for u in seed_users:
         if not await db.users.find_one({"email": u["email"]}):
             await db.users.insert_one({
@@ -451,18 +449,8 @@ async def seed():
     NEW_ROLL_PREFIX = "P26220"
     FEATURED_ROLL = "P2622010"
 
-    # Migration: if any student still uses the OLD roll format, wipe and reseed cleanly
-    old_format_exists = await db.users.find_one({"role": "student", "roll_number": {"$regex": "^(CS|EE|ME|CE|EC)2024"}})
-    student_count = await db.users.count_documents({"role": "student"})
-
-    if old_format_exists or student_count != 80:
-        # Wipe all students and all parcels — parcels will be reseeded with the new student pool
-        await db.users.delete_many({"role": "student"})
-        await db.parcels.delete_many({})
-        # Reset bin occupancy
-        await db.bins.update_many({}, {"$set": {"occupied": False}})
-
-        # Featured student
+    # Idempotent: only seed students when none exist
+    if await db.users.count_documents({"role": "student"}) == 0:
         await db.users.insert_one({
             "id": str(uuid.uuid4()),
             "email": "student@digicampus.edu",
@@ -493,9 +481,7 @@ async def seed():
             await db.users.insert_many(bulk)
 
     # Seed racks & bins
-    if await db.racks.count_documents({}) < 10:
-        await db.racks.delete_many({})
-        await db.bins.delete_many({})
+    if await db.racks.count_documents({}) == 0:
         racks_data = [
             ("A1", "Small Parcels"), ("A2", "Small Parcels"),
             ("B1", "Medium Parcels"), ("B2", "Medium Parcels"),
@@ -519,8 +505,8 @@ async def seed():
                 })
 
     # Seed parcels
-    if await db.parcels.count_documents({}) < 1200:
-        students = await db.users.find({"role": "student"}).to_list(200)
+    if await db.parcels.count_documents({}) == 0:
+        students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "name": 1, "email": 1, "roll_number": 1}).to_list(200)
         security_staff = await db.users.find_one({"role": "security"})
         racks = await db.racks.find({}).to_list(20)
         rack_map = {"small": ["A1", "A2"], "medium": ["B1", "B2"], "large": ["C1", "C2"], "fragile": ["E1"], "priority": ["LOCKER1"]}

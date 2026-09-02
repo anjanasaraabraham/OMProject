@@ -12,7 +12,7 @@ const ROLES = [
   { id: "admin", label: "Administrator", email: "admin@digicampus.edu", password: "admin123", icon: UserCog },
 ];
 
-const LOGO_URL = "https://customer-assets-eiarnc6j.emergentagent.net/job_spms-inventory-hub/artifacts/lxkaa9dr_GLIMG%20Logo.png";
+const LOGO_URL = process.env.REACT_APP_LOGO_URL;
 
 export default function Login() {
   const { login } = useAuth();
